@@ -1,0 +1,57 @@
+services:
+
+  db:
+    image: postgres:16-alpine
+    container_name: tsv-sticker-db
+    env_file: .env
+    environment:
+      POSTGRES_DB: stickerdb
+      POSTGRES_USER: sticker
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - tsv-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sticker -d stickerdb"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: tsv-sticker-backend
+    env_file: .env
+    environment:
+      DB_URL: jdbc:postgresql://db:5432/stickerdb
+      DB_USER: sticker
+      DB_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tsv-net
+    restart: on-failure
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: tsv-sticker-frontend
+    ports:
+      - "127.0.0.1:8090:80"
+    depends_on:
+      - backend
+    networks:
+      - tsv-net
+
+volumes:
+  postgres_data:
+
+networks:
+  tsv-net:
+    driver: bridge
